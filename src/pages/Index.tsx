@@ -55,7 +55,7 @@ const Index = () => {
         <div className="text-center mb-8">
           <h1 className="text-5xl font-bold text-white mb-2 flex items-center justify-center gap-3">
             <CloudLightning className="text-yellow-400" size={48} />
-            Infernal Flame Weather
+            Nimbus
           </h1>
           <p className="text-blue-200 text-lg">Your ultimate weather companion</p>
         </div>
@@ -139,7 +139,7 @@ const Index = () => {
         {/* Footer */}
         <div className="text-center mt-12">
           <p className="text-white/50 text-sm">
-            Powered by Infernal Flame Weather API
+            Powered by Openweathermap API
           </p>
         </div>
       </div>
