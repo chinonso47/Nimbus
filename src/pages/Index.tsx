@@ -1,5 +1,11 @@
 // src/pages/Index.tsx
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   CloudLightning,
   Search,
@@ -25,10 +31,10 @@ interface OWMWeather {
   description: string;
 }
 
-export interface CurrentWeather {
+interface CurrentWeather {
   name: string;
-  main: { temp: number; humidity: number; [k: string]: any };
-  wind: { speed: number; [k: string]: any };
+  main: { temp: number; humidity: number; [k: string]: unknown };
+  wind: { speed: number; [k: string]: unknown };
   weather: OWMWeather[];
   cod?: number | string;
   message?: string;
@@ -76,22 +82,32 @@ function cachedSet<T>(map: Map<string, CacheEntry<T>>, key: string, data: T) {
 }
 
 // ---------- fetch helpers (safe) ----------
-async function fetchCurrentWeather(city: string, signal?: AbortSignal): Promise<CurrentWeather | ErrorResponse> {
+async function fetchCurrentWeather(
+  city: string,
+  signal?: AbortSignal
+): Promise<CurrentWeather | ErrorResponse> {
   const key = city.toLowerCase();
   const cached = cachedGet(weatherCache, key);
   if (cached) return cached;
-  const url = `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)}&appid=${API_KEY}&units=metric`;
+  const url = `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(
+    city
+  )}&appid=${API_KEY}&units=metric`;
   const res = await fetch(url, { signal });
   const json = (await res.json()) as CurrentWeather | ErrorResponse;
   if (res.ok) cachedSet(weatherCache, key, json as CurrentWeather);
   return json;
 }
 
-async function fetchForecast(city: string, signal?: AbortSignal): Promise<ForecastResponse | ErrorResponse> {
+async function fetchForecast(
+  city: string,
+  signal?: AbortSignal
+): Promise<ForecastResponse | ErrorResponse> {
   const key = city.toLowerCase();
   const cached = cachedGet(forecastCache, key);
   if (cached) return cached;
-  const url = `https://api.openweathermap.org/data/2.5/forecast?q=${encodeURIComponent(city)}&appid=${API_KEY}&units=metric`;
+  const url = `https://api.openweathermap.org/data/2.5/forecast?q=${encodeURIComponent(
+    city
+  )}&appid=${API_KEY}&units=metric`;
   const res = await fetch(url, { signal });
   const json = (await res.json()) as ForecastResponse | ErrorResponse;
   if (res.ok) cachedSet(forecastCache, key, json as ForecastResponse);
@@ -101,10 +117,24 @@ async function fetchForecast(city: string, signal?: AbortSignal): Promise<Foreca
 // ---------- debounce hook ----------
 function useDebouncedValue<T>(value: T, delay = 400) {
   const [debounced, setDebounced] = useState<T>(value);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   useEffect(() => {
-    const t = setTimeout(() => setDebounced(value), delay);
-    return () => clearTimeout(t);
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+
+    timeoutRef.current = setTimeout(() => {
+      setDebounced(value);
+    }, delay);
+
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
   }, [value, delay]);
+
   return debounced;
 }
 
@@ -116,42 +146,104 @@ const fadeIn = {
 
 const subtleBounce = {
   hidden: { opacity: 0, scale: 0.98 },
-  visible: { opacity: 1, scale: 1, transition: { duration: 0.45, type: "spring", stiffness: 120 } },
+  visible: {
+    opacity: 1,
+    scale: 1,
+    transition: { duration: 0.45, type: "spring", stiffness: 120 },
+  },
 } as Variants;
 
 const cardVariant = {
   hidden: { opacity: 0, y: 16, scale: 0.98 },
-  visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.4, type: "spring", stiffness: 120 } },
+  visible: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: { duration: 0.4, type: "spring", stiffness: 120 },
+  },
 } as Variants;
 
 // ---------- small components ----------
-const SliderCard = React.memo(function SliderCard({ city }: { city: CurrentWeather }) {
+const SliderCard = React.memo(function SliderCard({
+  city,
+}: {
+  city: CurrentWeather;
+}) {
   return (
     <Card className="bg-white/8 backdrop-blur-md border-white/10 text-white">
       <CardContent className="p-4 text-center">
         <CardTitle className="text-lg">{city.name}</CardTitle>
-        <p className="capitalize text-sm">{city.weather?.[0]?.description ?? "--"}</p>
-        <p className="text-xl font-bold">{Math.round(city.main?.temp ?? 0)}°C</p>
+        <p className="capitalize text-sm">
+          {city.weather?.[0]?.description ?? "--"}
+        </p>
+        <p className="text-xl font-bold">
+          {Math.round(city.main?.temp ?? 0)}°C
+        </p>
       </CardContent>
     </Card>
   );
 });
 
-const ForecastCard = React.memo(function ForecastCard({ day }: { day: ForecastListItem }) {
-  const dateLabel = day?.dt_txt ? new Date(day.dt_txt).toLocaleDateString() : "--";
+const ForecastCard = React.memo(function ForecastCard({
+  day,
+}: {
+  day: ForecastListItem;
+}) {
+  const dateLabel = day?.dt_txt
+    ? new Date(day.dt_txt).toLocaleDateString()
+    : "--";
   const desc = day?.weather?.[0]?.description ?? "--";
   return (
-    <motion.div variants={subtleBounce} initial="hidden" animate="visible" exit="hidden">
+    <motion.div
+      variants={subtleBounce}
+      initial="hidden"
+      animate="visible"
+      exit="hidden"
+    >
       <Card className="bg-white/8 backdrop-blur-md border-white/10 text-white">
         <CardContent className="p-4 text-center">
           <CardTitle className="text-md">{dateLabel}</CardTitle>
           <p className="capitalize text-sm">{desc}</p>
-          <p className="text-xl font-bold">{Math.round(day?.main?.temp ?? 0)}°C</p>
+          <p className="text-xl font-bold">
+            {Math.round(day?.main?.temp ?? 0)}°C
+          </p>
         </CardContent>
       </Card>
     </motion.div>
   );
 });
+
+// ---------- keyword sets (severe vs normal-bad) ----------
+const SEVERE_KEYWORDS = [
+  "hurricane",
+  "tornado",
+  "cyclone",
+  "tsunami",
+  "earthquake",
+  "volcanic",
+  "wildfire",
+  "mudslide",
+  "landslide",
+  "flash flood",
+  "flooding",
+  "flood",
+  "storm surge",
+  "blizzard",
+  "dust storm",
+  "ice storm",
+  "hailstorm",
+] as const;
+
+type AlertSeverity = "none" | "bad" | "severe";
+
+function inferSeverityFromText(text: string): AlertSeverity {
+  const t = text.toLowerCase();
+  for (const k of SEVERE_KEYWORDS) {
+    if (t.includes(k)) return "severe";
+  }
+  // reached here: it's an alert but not disaster-level
+  return "bad";
+}
 
 // ---------- main component ----------
 const Index: React.FC = () => {
@@ -166,7 +258,9 @@ const Index: React.FC = () => {
   const [sliderData, setSliderData] = useState<CurrentWeather[]>([]);
   const [sliderLoading, setSliderLoading] = useState<boolean>(true);
 
-  const [background, setBackground] = useState<string>("from-slate-900 via-blue-900 to-slate-800");
+  const [background, setBackground] = useState<string>(
+    "from-slate-900 via-blue-900 to-slate-800"
+  );
 
   // small animation enable to avoid blocking first paint
   const [animateEnabled, setAnimateEnabled] = useState(false);
@@ -188,7 +282,10 @@ const Index: React.FC = () => {
         )
       );
       // filter only successful CurrentWeather items
-      const ok = results.filter((r): r is CurrentWeather => !!r && (r as CurrentWeather).name !== undefined);
+      const ok = results.filter(
+        (r): r is CurrentWeather =>
+          !!r && (r as CurrentWeather).name !== undefined
+      );
       setSliderData(ok);
     } finally {
       setSliderLoading(false);
@@ -213,26 +310,60 @@ const Index: React.FC = () => {
     return "Check current weather for suitable clothing.";
   }, []);
 
-  // Weather alerts (returns objects with isSafe flag)
+  // Weather alerts -> now returns { message, severity }
   const getWeatherAlerts = useCallback((data: CurrentWeather | null) => {
     if (!data) return [];
-    const alerts: { message: string; isSafe: boolean }[] = [];
+    const alerts: { message: string; severity: AlertSeverity }[] = [];
     const temp = data.main?.temp ?? NaN;
     const wind = data.wind?.speed ?? NaN;
     const condition = (data.weather?.[0]?.main ?? "").toLowerCase();
 
-    if (temp >= 35) alerts.push({ message: "🔥 Heat alert: Stay indoors & hydrate.", isSafe: false });
-    if (temp <= 5) alerts.push({ message: "🥶 Cold alert: Dress warmly.", isSafe: false });
-    if (condition.includes("storm")) alerts.push({ message: "⛈️ Storm warning: Avoid outdoor activities.", isSafe: false });
-    if (condition.includes("rain")) alerts.push({ message: "🌧️ Rain: carry an umbrella.", isSafe: false });
-    if (wind >= 50) alerts.push({ message: "💨 High wind: be cautious outdoors.", isSafe: false });
+    // Base messages (keep your emojis)
+    if (temp >= 35)
+      alerts.push({
+        message: "🔥 Heat alert: Stay indoors & hydrate.",
+        severity: "bad",
+      });
+    if (temp <= 5)
+      alerts.push({ message: "🥶 Cold alert: Dress warmly.", severity: "bad" });
+    if (condition.includes("storm"))
+      alerts.push({
+        message: "⛈️ Storm warning: Avoid outdoor activities.",
+        severity: "bad",
+      });
+    if (condition.includes("rain"))
+      alerts.push({ message: "🌧️ Rain: carry an umbrella.", severity: "bad" });
+    if (wind >= 50)
+      alerts.push({
+        message: "💨 High wind: be cautious outdoors.",
+        severity: "bad",
+      });
 
-    if (alerts.length === 0) alerts.push({ message: "✅ No severe weather alerts.", isSafe: true });
+    // Elevate to severe if any severe keyword appears in the text
+    for (let i = 0; i < alerts.length; i++) {
+      const s = inferSeverityFromText(alerts[i].message);
+      if (s === "severe") alerts[i] = { ...alerts[i], severity: "severe" };
+    }
+
+    // No alerts -> explicit green card
+    if (alerts.length === 0)
+      alerts.push({
+        message: "✅ No severe weather alerts.",
+        severity: "none",
+      });
+
     return alerts;
   }, []);
 
   // shorthand type guard for error responses
-  const isErrorResponse = (x: any): x is ErrorResponse => !!x && ("cod" in x) && Number((x as any).cod) !== 200;
+  const isErrorResponse = (x: unknown): x is ErrorResponse => {
+    return (
+      typeof x === "object" &&
+      x !== null &&
+      "cod" in x &&
+      Number((x as ErrorResponse).cod) !== 200
+    );
+  };
 
   // search effect (debounced) - uses AbortController and cached fetch helpers
   const ongoingSearchRef = useRef<AbortController | null>(null);
@@ -266,19 +397,26 @@ const Index: React.FC = () => {
           // w and f should be the expected types
           setWeatherData(w as CurrentWeather);
           // set background theme quickly
-          const weatherMain = (w as CurrentWeather).weather?.[0]?.main?.toLowerCase?.() ?? "";
-          if (weatherMain.includes("clear")) setBackground("from-yellow-300 via-orange-400 to-pink-500");
-          else if (weatherMain.includes("cloud")) setBackground("from-gray-600 via-gray-800 to-slate-900");
-          else if (weatherMain.includes("rain")) setBackground("from-blue-800 via-gray-700 to-gray-900");
-          else if (weatherMain.includes("snow")) setBackground("from-white via-blue-200 to-sky-300");
+          const weatherMain =
+            (w as CurrentWeather).weather?.[0]?.main?.toLowerCase?.() ?? "";
+          if (weatherMain.includes("clear"))
+            setBackground("from-yellow-300 via-orange-400 to-pink-500");
+          else if (weatherMain.includes("cloud"))
+            setBackground("from-gray-600 via-gray-800 to-slate-900");
+          else if (weatherMain.includes("rain"))
+            setBackground("from-blue-800 via-gray-700 to-gray-900");
+          else if (weatherMain.includes("snow"))
+            setBackground("from-white via-blue-200 to-sky-300");
           else setBackground("from-slate-900 via-blue-900 to-slate-800");
 
           // pick daily entries (every ~8 items from 3-hour forecast)
-          const daily: ForecastListItem[] = ((f as ForecastResponse).list ?? []).filter((_, idx) => idx % 8 === 0);
+          const daily: ForecastListItem[] = (
+            (f as ForecastResponse).list ?? []
+          ).filter((_, idx) => idx % 8 === 0);
           setForecastData(daily);
         }
       } catch (err) {
-        if ((err as any)?.name !== "AbortError") {
+        if (err instanceof Error && err.name !== "AbortError") {
           console.error("Search error", err);
           alert("Error fetching weather data");
         }
@@ -302,26 +440,67 @@ const Index: React.FC = () => {
   }, []);
 
   // derived alerts (memoized)
-  const alerts = useMemo(() => (weatherData ? getWeatherAlerts(weatherData) : []), [weatherData, getWeatherAlerts]);
+  const alerts = useMemo(
+    () => (weatherData ? getWeatherAlerts(weatherData) : []),
+    [weatherData, getWeatherAlerts]
+  );
+
+  // helper: class + icon per severity
+  const alertVisual = (severity: AlertSeverity) => {
+    if (severity === "none") {
+      return {
+        cls: "bg-alert-green text-white",
+        icon: <CheckCircle size={20} className="mt-1" />,
+      };
+    }
+    if (severity === "severe") {
+      return {
+        cls: "bg-alert-red text-white",
+        icon: <AlertTriangle size={20} className="mt-1" />,
+      };
+    }
+    // "bad"
+    return {
+      cls: "bg-alert-orange text-white",
+      icon: <AlertTriangle size={20} className="mt-1" />,
+    };
+  };
 
   // ---------- render ----------
   return (
-    <div className={`min-h-screen relative overflow-hidden bg-gradient-to-br ${background}`}>
+    <div
+      className={`min-h-screen relative overflow-hidden bg-gradient-to-br ${background}`}
+    >
       <div className="relative z-10 container mx-auto px-4 py-8">
         {/* header */}
-        <motion.div className="text-center mb-8" initial="hidden" animate={animateEnabled ? "visible" : "hidden"} variants={fadeIn}>
+        <motion.div
+          className="text-center mb-8"
+          initial="hidden"
+          animate={animateEnabled ? "visible" : "hidden"}
+          variants={fadeIn}
+        >
           <h1 className="text-5xl font-bold text-white mb-2 flex items-center justify-center gap-3">
             <CloudLightning className="text-yellow-400" size={48} />
             Nimbus
           </h1>
-          <p className="text-blue-200 text-lg">Your ultimate weather companion</p>
+          <p className="text-blue-200 text-lg">
+            Your ultimate weather companion
+          </p>
         </motion.div>
 
         {/* search */}
-        <motion.div className="max-w-md mx-auto mb-8" initial="hidden" animate={animateEnabled ? "visible" : "hidden"} variants={fadeIn}>
+        <motion.div
+          className="max-w-md mx-auto mb-8"
+          initial="hidden"
+          animate={animateEnabled ? "visible" : "hidden"}
+          variants={fadeIn}
+        >
           <div className="flex gap-2">
             <div className="relative flex-1">
-              <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" size={20} />
+              <MapPin
+                className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground"
+                size={20}
+              />
               <Input
                 value={city}
                 onChange={(e) => setCity(e.target.value)}
@@ -330,7 +509,11 @@ const Index: React.FC = () => {
                 className="pl-10 bg-white/10 backdrop-blur-sm border-white/20 text-white placeholder:text-white/60"
               />
             </div>
-            <Button onClick={onSearchClick} disabled={loadingSearch} className="bg-yellow-500 hover:bg-yellow-600 text-black font-semibold">
+            <Button
+              onClick={onSearchClick}
+              disabled={loadingSearch}
+              className="bg-yellow-500 hover:bg-yellow-600 text-black font-semibold"
+            >
               <Search size={18} />
             </Button>
           </div>
@@ -339,22 +522,28 @@ const Index: React.FC = () => {
         {/* Alerts */}
         <AnimatePresence>
           {alerts.length > 0 && weatherData && (
-            <motion.div className="max-w-2xl mx-auto mb-6" initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }}>
+            <motion.div
+              className="max-w-2xl mx-auto mb-6"
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+            >
               <div className="space-y-2">
-                {alerts.map((a, i) => (
-                  <motion.div
-                    key={i}
-                    initial={{ opacity: 0, y: -6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.25, delay: i * 0.06 }}
-                    className={`rounded-xl shadow-xl p-3 flex items-start gap-3 ${
-                      a.isSafe ? "bg-green-600/90 text-white" : "bg-red-600/85 text-white"
-                    }`}
-                  >
-                    {a.isSafe ? <CheckCircle size={20} className="mt-1" /> : <AlertTriangle size={20} className="mt-1" />}
-                    <div className="text-sm leading-snug">{a.message}</div>
-                  </motion.div>
-                ))}
+                {alerts.map((a, i) => {
+                  const { cls, icon } = alertVisual(a.severity);
+                  return (
+                    <motion.div
+                      key={i}
+                      initial={{ opacity: 0, y: -6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.25, delay: i * 0.06 }}
+                      className={`rounded-xl shadow-xl p-3 flex items-start gap-3 ${cls}`}
+                    >
+                      {icon}
+                      <div className="text-sm leading-snug">{a.message}</div>
+                    </motion.div>
+                  );
+                })}
               </div>
             </motion.div>
           )}
@@ -364,7 +553,10 @@ const Index: React.FC = () => {
         {loadingSearch ? (
           <div className="grid md:grid-cols-3 gap-4 mb-8">
             {Array.from({ length: 3 }).map((_, i) => (
-              <Card key={i} className="bg-white/6 backdrop-blur-md border-white/8">
+              <Card
+                key={i}
+                className="bg-white/6 backdrop-blur-md border-white/8"
+              >
                 <CardContent className="p-4">
                   <Skeleton className="h-6 w-1/2 mb-3" />
                   <Skeleton className="h-4 w-3/4 mb-3" />
@@ -376,23 +568,44 @@ const Index: React.FC = () => {
         ) : (
           <AnimatePresence>
             {weatherData && (
-              <motion.div key={weatherData.name} variants={subtleBounce} initial="hidden" animate="visible" exit="hidden" className="grid md:grid-cols-3 gap-4 mb-8">
+              <motion.div
+                key={weatherData.name}
+                variants={subtleBounce}
+                initial="hidden"
+                animate="visible"
+                exit="hidden"
+                className="grid md:grid-cols-3 gap-4 mb-8"
+              >
                 {/* Current Weather */}
-                <motion.div variants={cardVariant} initial="hidden" animate="visible">
+                <motion.div
+                  variants={cardVariant}
+                  initial="hidden"
+                  animate="visible"
+                >
                   <Card className="bg-white/8 backdrop-blur-md border-white/10 text-white">
                     <CardContent className="p-4 text-center">
                       <CardTitle>Current Weather</CardTitle>
                       <div className="mt-2">
-                        <div className="text-xl font-semibold">{weatherData.name}</div>
-                        <div className="capitalize text-sm">{weatherData.weather?.[0]?.description ?? "--"}</div>
-                        <div className="text-2xl font-bold mt-2">{Math.round(weatherData.main?.temp ?? 0)}°C</div>
+                        <div className="text-xl font-semibold">
+                          {weatherData.name}
+                        </div>
+                        <div className="capitalize text-sm">
+                          {weatherData.weather?.[0]?.description ?? "--"}
+                        </div>
+                        <div className="text-2xl font-bold mt-2">
+                          {Math.round(weatherData.main?.temp ?? 0)}°C
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
                 </motion.div>
 
                 {/* Summary - iconified */}
-                <motion.div variants={cardVariant} initial="hidden" animate="visible">
+                <motion.div
+                  variants={cardVariant}
+                  initial="hidden"
+                  animate="visible"
+                >
                   <Card className="bg-white/8 backdrop-blur-md border-white/10 text-white">
                     <CardContent className="p-4">
                       <CardTitle>Summary</CardTitle>
@@ -400,22 +613,34 @@ const Index: React.FC = () => {
                         <div className="flex items-center gap-2">
                           <Thermometer size={20} />
                           <div>
-                            <div className="text-xs text-muted-foreground">Temp</div>
-                            <div className="font-semibold">{Math.round(weatherData.main?.temp ?? 0)}°C</div>
+                            <div className="text-xs text-muted-foreground">
+                              Temp
+                            </div>
+                            <div className="font-semibold">
+                              {Math.round(weatherData.main?.temp ?? 0)}°C
+                            </div>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
                           <Droplets size={20} />
                           <div>
-                            <div className="text-xs text-muted-foreground">Humidity</div>
-                            <div className="font-semibold">{weatherData.main?.humidity ?? "--"}%</div>
+                            <div className="text-xs text-muted-foreground">
+                              Humidity
+                            </div>
+                            <div className="font-semibold">
+                              {weatherData.main?.humidity ?? "--"}%
+                            </div>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
                           <Wind size={20} />
                           <div>
-                            <div className="text-xs text-muted-foreground">Wind</div>
-                            <div className="font-semibold">{weatherData.wind?.speed ?? "--"} km/h</div>
+                            <div className="text-xs text-muted-foreground">
+                              Wind
+                            </div>
+                            <div className="font-semibold">
+                              {weatherData.wind?.speed ?? "--"} km/h
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -424,11 +649,17 @@ const Index: React.FC = () => {
                 </motion.div>
 
                 {/* Clothing suggestion */}
-                <motion.div variants={cardVariant} initial="hidden" animate="visible">
+                <motion.div
+                  variants={cardVariant}
+                  initial="hidden"
+                  animate="visible"
+                >
                   <Card className="bg-white/8 backdrop-blur-md border-white/10 text-white">
                     <CardContent className="p-4 text-center">
                       <CardTitle>Style Forecast</CardTitle>
-                      <div className="mt-4 text-sm">{getClothingSuggestion(weatherData)}</div>
+                      <div className="mt-4 text-sm">
+                        {getClothingSuggestion(weatherData)}
+                      </div>
                     </CardContent>
                   </Card>
                 </motion.div>
@@ -442,7 +673,12 @@ const Index: React.FC = () => {
           <h2 className="text-white text-2xl mb-4">5-Day Forecast</h2>
 
           {forecastData?.length ? (
-            <motion.div className="grid grid-cols-2 md:grid-cols-5 gap-4" initial="hidden" animate="visible" variants={fadeIn}>
+            <motion.div
+              className="grid grid-cols-2 md:grid-cols-5 gap-4"
+              initial="hidden"
+              animate="visible"
+              variants={fadeIn}
+            >
               {forecastData.map((d, i) => (
                 <ForecastCard key={i} day={d} />
               ))}
@@ -460,7 +696,9 @@ const Index: React.FC = () => {
               ))}
             </div>
           ) : (
-            <div className="text-white/60">Search a city to see the 5-day forecast.</div>
+            <div className="text-white/60">
+              Search a city to see the 5-day forecast.
+            </div>
           )}
         </div>
 
@@ -481,7 +719,12 @@ const Index: React.FC = () => {
               ))}
             </div>
           ) : (
-            <motion.div className="grid grid-cols-2 md:grid-cols-5 gap-4" initial="hidden" animate="visible" variants={fadeIn}>
+            <motion.div
+              className="grid grid-cols-2 md:grid-cols-5 gap-4"
+              initial="hidden"
+              animate="visible"
+              variants={fadeIn}
+            >
               {sliderData.map((c, i) => (
                 <SliderCard key={i} city={c} />
               ))}
