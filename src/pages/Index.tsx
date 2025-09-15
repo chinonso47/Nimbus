@@ -253,6 +253,7 @@ const Index: React.FC = () => {
 
   const [weatherData, setWeatherData] = useState<CurrentWeather | null>(null);
   const [forecastData, setForecastData] = useState<ForecastListItem[]>([]);
+  const [citySearched, setCitySearched] = useState<boolean>(false);
   const [loadingSearch, setLoadingSearch] = useState<boolean>(false);
 
   const [sliderData, setSliderData] = useState<CurrentWeather[]>([]);
@@ -389,6 +390,7 @@ const Index: React.FC = () => {
           setWeatherData(null);
           setForecastData([]);
           // alert(w.message ?? "City not found");
+          setCitySearched(true);
         } else if (isErrorResponse(f)) {
           setWeatherData(null);
           setForecastData([]);
@@ -674,7 +676,7 @@ const Index: React.FC = () => {
             <h2 className="text-white text-2xl mb-4">5-Day Forecast</h2>
           )}
 
-          {forecastData?.length < 1 ? (
+          {citySearched && forecastData?.length < 1 ? (
             <p className="text-center text-red-500">City could not be found</p>
           ) : forecastData.length > 0 ? (
             <motion.div
