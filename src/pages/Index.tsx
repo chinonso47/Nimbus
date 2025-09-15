@@ -115,7 +115,7 @@ async function fetchForecast(
 }
 
 // ---------- debounce hook ----------
-function useDebouncedValue<T>(value: T, delay = 400) {
+function useDebouncedValue<T>(value: T, delay = 2000) {
   const [debounced, setDebounced] = useState<T>(value);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -388,7 +388,7 @@ const Index: React.FC = () => {
         if (isErrorResponse(w)) {
           setWeatherData(null);
           setForecastData([]);
-          alert(w.message ?? "City not found");
+          // alert(w.message ?? "City not found");
         } else if (isErrorResponse(f)) {
           setWeatherData(null);
           setForecastData([]);
@@ -670,9 +670,13 @@ const Index: React.FC = () => {
 
         {/* 5-day forecast */}
         <div className="mb-12">
-          <h2 className="text-white text-2xl mb-4">5-Day Forecast</h2>
+          {forecastData.length > 0 && (
+            <h2 className="text-white text-2xl mb-4">5-Day Forecast</h2>
+          )}
 
-          {forecastData?.length ? (
+          {forecastData?.length < 1 ? (
+            <p className="text-center text-red-500">City could not be found</p>
+          ) : forecastData.length > 0 ? (
             <motion.div
               className="grid grid-cols-2 md:grid-cols-5 gap-4"
               initial="hidden"
