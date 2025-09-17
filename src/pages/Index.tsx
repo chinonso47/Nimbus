@@ -21,7 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { motion, AnimatePresence, Variants } from "framer-motion";
-import addNotification from 'react-push-notification';
+import addNotification from "react-push-notification";
 
 const API_KEY = import.meta.env.VITE_OPENWEATHER_API_KEY as string;
 
@@ -248,18 +248,6 @@ function inferSeverityFromText(text: string): AlertSeverity {
 
 // ---------- main component ----------
 const Index: React.FC = () => {
-
-   const pushNotification = () => {
-        addNotification({
-            title: 'Warning',
-            subtitle: 'This is a subtitle',
-            message: 'This is a very long message',
-            theme: 'darkblue',
-            native: true, // when using native, your OS will handle theming.
-            onClick:()=>console.log("Notification")
-        });
-    };
-    
   // state
   const [city, setCity] = useState<string>("");
   const debouncedCity = useDebouncedValue(city, 450);
@@ -365,7 +353,6 @@ const Index: React.FC = () => {
         message: "✅ No severe weather alerts.",
         severity: "none",
       });
-
     return alerts;
   }, []);
 
@@ -411,7 +398,7 @@ const Index: React.FC = () => {
         } else {
           // w and f should be the expected types
           setWeatherData(w as CurrentWeather);
-          pushNotification()
+          // pushNotification();
           // set background theme quickly
           const weatherMain =
             (w as CurrentWeather).weather?.[0]?.main?.toLowerCase?.() ?? "";
@@ -453,8 +440,7 @@ const Index: React.FC = () => {
   // search action (trim and let debounce trigger)
   const onSearchClick = useCallback(() => {
     setCity((c) => c.trim());
-    pushNotification()
-
+    // pushNotification();
   }, []);
 
   // derived alerts (memoized)
@@ -462,6 +448,29 @@ const Index: React.FC = () => {
     () => (weatherData ? getWeatherAlerts(weatherData) : []),
     [weatherData, getWeatherAlerts]
   );
+
+  console.log(alerts);
+
+  useEffect(() => {
+    const notificationHeader = alerts[0]?.message;
+    const notificationMessage = weatherData
+      ? getClothingSuggestion(weatherData)
+      : null;
+    const pushNotification = () => {
+      addNotification({
+        title: notificationHeader,
+        message: notificationMessage,
+        theme: "darkblue",
+        native: true, // when using native, your OS will handle theming.
+        duration: 5000,
+        // onClick: () => console.log("Notification"),
+      });
+    };
+
+    if (notificationHeader && notificationMessage) {
+      pushNotification();
+    }
+  }, [alerts]);
 
   // helper: class + icon per severity
   const alertVisual = (severity: AlertSeverity) => {
@@ -504,7 +513,6 @@ const Index: React.FC = () => {
           <p className="text-blue-200 text-lg">
             Your ultimate weather companion
           </p>
-           
         </motion.div>
 
         {/* search */}
