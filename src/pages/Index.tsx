@@ -462,7 +462,7 @@ const Index: React.FC = () => {
         message: notificationMessage,
         theme: "darkblue",
         native: true, // when using native, your OS will handle theming.
-        duration: 5000,
+        duration: 10000,
         // onClick: () => console.log("Notification"),
       });
     };
@@ -525,7 +525,7 @@ const Index: React.FC = () => {
           <div className="flex gap-2">
             <div className="relative flex-1">
               <MapPin
-                className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground"
+                className="absolute left-3 top-1/2 z-10 transform -translate-y-1/2 text-muted-foreground text-white"
                 size={20}
               />
               <Input
@@ -536,13 +536,13 @@ const Index: React.FC = () => {
                 className="pl-10 bg-white/10 backdrop-blur-sm border-white/20 text-white placeholder:text-white/60"
               />
             </div>
-            <Button
+            {/* <Button
               onClick={onSearchClick}
               disabled={loadingSearch}
               className="bg-yellow-500 hover:bg-yellow-600 text-black font-semibold"
             >
               <Search size={18} />
-            </Button>
+            </Button> */}
           </div>
         </motion.div>
 
