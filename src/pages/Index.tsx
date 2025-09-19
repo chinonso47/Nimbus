@@ -451,53 +451,66 @@ const Index: React.FC = () => {
 
   console.log(alerts);
 
-  useEffect(() => {
-    // Safely derive strings (no null/undefined)
-    const title = (
-      alerts && alerts[0] && alerts[0].message ? String(alerts[0].message) : ""
-    ).trim();
-    const body =
-      weatherData && typeof getClothingSuggestion === "function"
-        ? String(getClothingSuggestion(weatherData) ?? "").trim()
-        : "";
+  // useEffect(() => {
+  //   // Safely derive strings (no null/undefined)
+  //   const title = (
+  //     alerts && alerts[0] && alerts[0].message ? String(alerts[0].message) : ""
+  //   ).trim();
+  //   const body =
+  //     weatherData && typeof getClothingSuggestion === "function"
+  //       ? String(getClothingSuggestion(weatherData) ?? "").trim()
+  //       : "";
 
-    // Fire only when we actually have something to show
-    if (!title || !body) return;
+  //   // Fire only when we actually have something to show
+  //   if (!title || !body) return;
 
-    // Never request permission here (do it from a user gesture elsewhere)
-    if (typeof window === "undefined" || !("Notification" in window)) return;
-    if (Notification.permission !== "granted") return;
+  //   // Never request permission here (do it from a user gesture elsewhere)
+  //   if (typeof window === "undefined" || !("Notification" in window)) return;
+  //   if (Notification.permission !== "granted") return;
 
-    let cancelled = false;
+  //   let cancelled = false;
 
-    (async () => {
-      try {
-        // Prefer service worker on Android if available
-        if ("serviceWorker" in navigator) {
-          const reg = await navigator.serviceWorker.getRegistration();
-          if (!cancelled && reg?.showNotification) {
-            await reg.showNotification(title, {
-              body /*, icon: "/icon.png" */,
-            });
-            return;
-          }
+  //   (async () => {
+  //     try {
+  //       // Prefer service worker on Android if available
+  //       if ("serviceWorker" in navigator) {
+  //         const reg = await navigator.serviceWorker.getRegistration();
+  //         if (!cancelled && reg?.showNotification) {
+  //           await reg.showNotification(title, {
+  //             body /*, icon: "/icon.png" */,
+  //           });
+  //           return;
+  //         }
+  //       }
+
+  //       // Fallback to page-context notification
+  //       if (!cancelled) {
+  //         // @ts-ignore - some TS setups complain about constructor types
+  //         new Notification(title, { body /*, icon: "/icon.png" */ });
+  //       }
+  //     } catch (err) {
+  //       // Prevent blank screen on runtime errors
+  //       console.error("Notification error:", err);
+  //     }
+  //   })();
+
+  //   return () => {
+  //     cancelled = true;
+  //   };
+  // }, [alerts, weatherData, getClothingSuggestion]);
+
+  function requestNotificationPermission() {
+    if ("Notification" in window) {
+      Notification.requestPermission().then((permission) => {
+        if (permission === "granted") {
+          new Notification("Test Notification", {
+            body: "This should appear without crashing.",
+            icon: "/icon.png",
+          });
         }
-
-        // Fallback to page-context notification
-        if (!cancelled) {
-          // @ts-ignore - some TS setups complain about constructor types
-          new Notification(title, { body /*, icon: "/icon.png" */ });
-        }
-      } catch (err) {
-        // Prevent blank screen on runtime errors
-        console.error("Notification error:", err);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [alerts, weatherData, getClothingSuggestion]);
+      });
+    }
+  }
 
   // helper: class + icon per severity
   const alertVisual = (severity: AlertSeverity) => {
@@ -563,13 +576,13 @@ const Index: React.FC = () => {
                 className="pl-10 bg-white/10 backdrop-blur-sm border-white/20 text-white placeholder:text-white/60"
               />
             </div>
-            {/* <Button
-              onClick={onSearchClick}
+            <Button
+              onClick={requestNotificationPermission}
               disabled={loadingSearch}
               className="bg-yellow-500 hover:bg-yellow-600 text-black font-semibold"
             >
               <Search size={18} />
-            </Button> */}
+            </Button>
           </div>
         </motion.div>
 
