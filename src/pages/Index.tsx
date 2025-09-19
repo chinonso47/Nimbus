@@ -21,7 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { motion, AnimatePresence, Variants } from "framer-motion";
-import addNotification from "react-push-notification";
+// import addNotification from "react-push-notification";
 
 const API_KEY = import.meta.env.VITE_OPENWEATHER_API_KEY as string;
 
@@ -456,21 +456,35 @@ const Index: React.FC = () => {
     const notificationMessage = weatherData
       ? getClothingSuggestion(weatherData)
       : null;
+
     const pushNotification = () => {
-      addNotification({
-        title: notificationHeader,
-        message: notificationMessage,
-        theme: "darkblue",
-        native: true, // when using native, your OS will handle theming.
-        duration: 10000,
-        // onClick: () => console.log("Notification"),
-      });
+      if (!("Notification" in window)) {
+        console.log("This browser does not support notifications.");
+        return;
+      }
+
+      // Request permission if not already granted
+      if (Notification.permission === "granted") {
+        new Notification(notificationHeader, {
+          body: notificationMessage,
+          // icon: "/icon.png", // optional, replace with your app icon
+        });
+      } else if (Notification.permission !== "denied") {
+        Notification.requestPermission().then((permission) => {
+          if (permission === "granted") {
+            new Notification(notificationHeader, {
+              body: notificationMessage,
+              // icon: "/icon.png",
+            });
+          }
+        });
+      }
     };
 
     if (notificationHeader && notificationMessage) {
       pushNotification();
     }
-  }, [alerts]);
+  }, [alerts, weatherData, getClothingSuggestion]);
 
   // helper: class + icon per severity
   const alertVisual = (severity: AlertSeverity) => {
