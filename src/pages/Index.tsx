@@ -452,38 +452,51 @@ const Index: React.FC = () => {
   console.log(alerts);
 
   useEffect(() => {
-    const notificationHeader = alerts[0]?.message;
-    const notificationMessage = weatherData
-      ? getClothingSuggestion(weatherData)
-      : null;
+    // Safely derive strings (no null/undefined)
+    const title = (
+      alerts && alerts[0] && alerts[0].message ? String(alerts[0].message) : ""
+    ).trim();
+    const body =
+      weatherData && typeof getClothingSuggestion === "function"
+        ? String(getClothingSuggestion(weatherData) ?? "").trim()
+        : "";
 
-    const pushNotification = () => {
-      if (!("Notification" in window)) {
-        console.log("This browser does not support notifications.");
-        return;
-      }
+    // Fire only when we actually have something to show
+    if (!title || !body) return;
 
-      // Request permission if not already granted
-      if (Notification.permission === "granted") {
-        new Notification(notificationHeader, {
-          body: notificationMessage,
-          // icon: "/icon.png", // optional, replace with your app icon
-        });
-      } else if (Notification.permission !== "denied") {
-        Notification.requestPermission().then((permission) => {
-          if (permission === "granted") {
-            new Notification(notificationHeader, {
-              body: notificationMessage,
-              // icon: "/icon.png",
+    // Never request permission here (do it from a user gesture elsewhere)
+    if (typeof window === "undefined" || !("Notification" in window)) return;
+    if (Notification.permission !== "granted") return;
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        // Prefer service worker on Android if available
+        if ("serviceWorker" in navigator) {
+          const reg = await navigator.serviceWorker.getRegistration();
+          if (!cancelled && reg?.showNotification) {
+            await reg.showNotification(title, {
+              body /*, icon: "/icon.png" */,
             });
+            return;
           }
-        });
-      }
-    };
+        }
 
-    if (notificationHeader && notificationMessage) {
-      pushNotification();
-    }
+        // Fallback to page-context notification
+        if (!cancelled) {
+          // @ts-ignore - some TS setups complain about constructor types
+          new Notification(title, { body /*, icon: "/icon.png" */ });
+        }
+      } catch (err) {
+        // Prevent blank screen on runtime errors
+        console.error("Notification error:", err);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [alerts, weatherData, getClothingSuggestion]);
 
   // helper: class + icon per severity
