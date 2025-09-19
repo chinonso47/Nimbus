@@ -451,66 +451,44 @@ const Index: React.FC = () => {
 
   console.log(alerts);
 
-  // useEffect(() => {
-  //   // Safely derive strings (no null/undefined)
-  //   const title = (
-  //     alerts && alerts[0] && alerts[0].message ? String(alerts[0].message) : ""
-  //   ).trim();
-  //   const body =
-  //     weatherData && typeof getClothingSuggestion === "function"
-  //       ? String(getClothingSuggestion(weatherData) ?? "").trim()
-  //       : "";
+  useEffect(() => {
+    const notificationHeader = alerts[0]?.message || "Weather Update";
+    const notificationMessage = weatherData
+      ? getClothingSuggestion(weatherData)
+      : null;
 
-  //   // Fire only when we actually have something to show
-  //   if (!title || !body) return;
+    const pushNotification = () => {
+      if (!("Notification" in window)) {
+        console.log("This browser does not support notifications.");
+        return;
+      }
 
-  //   // Never request permission here (do it from a user gesture elsewhere)
-  //   if (typeof window === "undefined" || !("Notification" in window)) return;
-  //   if (Notification.permission !== "granted") return;
+      if (!notificationHeader || !notificationMessage) {
+        console.log("Missing notification data, skipping...");
+        return;
+      }
 
-  //   let cancelled = false;
+      if (Notification.permission === "granted") {
+        new Notification(notificationHeader, {
+          body: notificationMessage,
+          icon: "/icon.png",
+        });
+      } else if (Notification.permission !== "denied") {
+        Notification.requestPermission().then((permission) => {
+          if (permission === "granted") {
+            new Notification(notificationHeader, {
+              body: notificationMessage,
+              icon: "/icon.png",
+            });
+          }
+        });
+      }
+    };
 
-  //   (async () => {
-  //     try {
-  //       // Prefer service worker on Android if available
-  //       if ("serviceWorker" in navigator) {
-  //         const reg = await navigator.serviceWorker.getRegistration();
-  //         if (!cancelled && reg?.showNotification) {
-  //           await reg.showNotification(title, {
-  //             body /*, icon: "/icon.png" */,
-  //           });
-  //           return;
-  //         }
-  //       }
-
-  //       // Fallback to page-context notification
-  //       if (!cancelled) {
-  //         // @ts-ignore - some TS setups complain about constructor types
-  //         new Notification(title, { body /*, icon: "/icon.png" */ });
-  //       }
-  //     } catch (err) {
-  //       // Prevent blank screen on runtime errors
-  //       console.error("Notification error:", err);
-  //     }
-  //   })();
-
-  //   return () => {
-  //     cancelled = true;
-  //   };
-  // }, [alerts, weatherData, getClothingSuggestion]);
-
-  function requestNotificationPermission() {
-    if ("Notification" in window) {
-      Notification.requestPermission().then((permission) => {
-        if (permission === "granted") {
-          new Notification("Test Notification", {
-            body: "This should appear without crashing.",
-            icon: "/icon.png",
-          });
-        }
-      });
+    if (notificationHeader && notificationMessage) {
+      pushNotification();
     }
-  }
+  }, [alerts, weatherData, getClothingSuggestion]);
 
   // helper: class + icon per severity
   const alertVisual = (severity: AlertSeverity) => {
@@ -576,13 +554,13 @@ const Index: React.FC = () => {
                 className="pl-10 bg-white/10 backdrop-blur-sm border-white/20 text-white placeholder:text-white/60"
               />
             </div>
-            <Button
-              onClick={requestNotificationPermission}
+            {/* <Button
+              onClick={onSearchClick}
               disabled={loadingSearch}
               className="bg-yellow-500 hover:bg-yellow-600 text-black font-semibold"
             >
               <Search size={18} />
-            </Button>
+            </Button> */}
           </div>
         </motion.div>
 
