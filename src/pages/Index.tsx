@@ -1,4 +1,6 @@
 // src/pages/Index.tsx
+import { sendSms as sendSmsApi } from "@/lib/sms";
+
 import React, {
   useCallback,
   useEffect,
@@ -8,7 +10,6 @@ import React, {
 } from "react";
 import {
   CloudLightning,
-  Search,
   MapPin,
   AlertTriangle,
   Droplets,
@@ -21,11 +22,10 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { motion, AnimatePresence, Variants } from "framer-motion";
-// import addNotification from "react-push-notification";
 
 const API_KEY = import.meta.env.VITE_OPENWEATHER_API_KEY as string;
 
-// ---------- types ----------
+/* ---------- types ---------- */
 interface OWMWeather {
   id?: number;
   main: string;
@@ -58,11 +58,11 @@ export interface ErrorResponse {
   message?: string;
 }
 
-// ---------- small config ----------
+/* ---------- small config ---------- */
 const CITIES = ["London", "Tokyo", "New York", "Accra", "Paris"] as const;
 const CACHE_TTL_MS = 1000 * 60 * 5; // 5 minutes
 
-// ---------- caches (generic) ----------
+/* ---------- caches (generic) ---------- */
 type CacheEntry<T> = { ts: number; data: T };
 const weatherCache = new Map<string, CacheEntry<CurrentWeather>>();
 const forecastCache = new Map<string, CacheEntry<ForecastResponse>>();
@@ -82,7 +82,7 @@ function cachedSet<T>(map: Map<string, CacheEntry<T>>, key: string, data: T) {
   map.set(key, { ts: now(), data });
 }
 
-// ---------- fetch helpers (safe) ----------
+/* ---------- fetch helpers (safe) ---------- */
 async function fetchCurrentWeather(
   city: string,
   signal?: AbortSignal
@@ -115,7 +115,15 @@ async function fetchForecast(
   return json;
 }
 
-// ---------- debounce hook ----------
+/* ---------- Phone normalize helper (no hooks; OK at module scope) ---------- */
+function toE164(input: string) {
+  let s = String(input).replace(/\s|-/g, "");
+  if (s.startsWith("0")) s = "+233" + s.slice(1); // 024... -> +23324...
+  if (!s.startsWith("+")) s = "+233" + s;
+  return s;
+}
+
+/* ---------- debounce hook ---------- */
 function useDebouncedValue<T>(value: T, delay = 2000) {
   const [debounced, setDebounced] = useState<T>(value);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -139,7 +147,7 @@ function useDebouncedValue<T>(value: T, delay = 2000) {
   return debounced;
 }
 
-// ---------- framer variants ----------
+/* ---------- framer variants ---------- */
 const fadeIn = {
   hidden: { opacity: 0, y: 8 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.35 } },
@@ -164,7 +172,7 @@ const cardVariant = {
   },
 } as Variants;
 
-// ---------- small components ----------
+/* ---------- small components ---------- */
 const SliderCard = React.memo(function SliderCard({
   city,
 }: {
@@ -214,7 +222,7 @@ const ForecastCard = React.memo(function ForecastCard({
   );
 });
 
-// ---------- keyword sets (severe vs normal-bad) ----------
+/* ---------- keyword sets (severe vs normal-bad) ---------- */
 const SEVERE_KEYWORDS = [
   "hurricane",
   "tornado",
@@ -242,11 +250,10 @@ function inferSeverityFromText(text: string): AlertSeverity {
   for (const k of SEVERE_KEYWORDS) {
     if (t.includes(k)) return "severe";
   }
-  // reached here: it's an alert but not disaster-level
   return "bad";
 }
 
-// ---------- main component ----------
+/* ---------- main component ---------- */
 const Index: React.FC = () => {
   // state
   const [city, setCity] = useState<string>("");
@@ -271,6 +278,11 @@ const Index: React.FC = () => {
     return () => cancelAnimationFrame(t);
   }, []);
 
+  // ✅ SMS-related state MUST be inside the component
+  const [phone, setPhone] = useState<string>("");
+  const [smsOptIn, setSmsOptIn] = useState<boolean>(false);
+  const lastSentRef = useRef<string | null>(null);
+
   // fetch slider (non-blocking)
   const fetchSlider = useCallback(async () => {
     setSliderLoading(true);
@@ -283,7 +295,6 @@ const Index: React.FC = () => {
           })
         )
       );
-      // filter only successful CurrentWeather items
       const ok = results.filter(
         (r): r is CurrentWeather =>
           !!r && (r as CurrentWeather).name !== undefined
@@ -320,7 +331,6 @@ const Index: React.FC = () => {
     const wind = data.wind?.speed ?? NaN;
     const condition = (data.weather?.[0]?.main ?? "").toLowerCase();
 
-    // Base messages (keep your emojis)
     if (temp >= 35)
       alerts.push({
         message: "🔥 Heat alert: Stay indoors & hydrate.",
@@ -341,13 +351,11 @@ const Index: React.FC = () => {
         severity: "bad",
       });
 
-    // Elevate to severe if any severe keyword appears in the text
     for (let i = 0; i < alerts.length; i++) {
       const s = inferSeverityFromText(alerts[i].message);
       if (s === "severe") alerts[i] = { ...alerts[i], severity: "severe" };
     }
 
-    // No alerts -> explicit green card
     if (alerts.length === 0)
       alerts.push({
         message: "✅ No severe weather alerts.",
@@ -366,7 +374,7 @@ const Index: React.FC = () => {
     );
   };
 
-  // search effect (debounced) - uses AbortController and cached fetch helpers
+  // search effect (debounced)
   const ongoingSearchRef = useRef<AbortController | null>(null);
   useEffect(() => {
     if (!debouncedCity || !debouncedCity.trim()) return;
@@ -385,21 +393,17 @@ const Index: React.FC = () => {
 
         if (cancelled) return;
 
-        // if API returned an error-like object, show alert and clear UI
         if (isErrorResponse(w)) {
           setWeatherData(null);
           setForecastData([]);
-          // alert(w.message ?? "City not found");
           setCitySearched(true);
         } else if (isErrorResponse(f)) {
           setWeatherData(null);
           setForecastData([]);
           alert(f.message ?? "Forecast not available");
         } else {
-          // w and f should be the expected types
           setWeatherData(w as CurrentWeather);
-          // pushNotification();
-          // set background theme quickly
+
           const weatherMain =
             (w as CurrentWeather).weather?.[0]?.main?.toLowerCase?.() ?? "";
           if (weatherMain.includes("clear"))
@@ -412,7 +416,6 @@ const Index: React.FC = () => {
             setBackground("from-white via-blue-200 to-sky-300");
           else setBackground("from-slate-900 via-blue-900 to-slate-800");
 
-          // pick daily entries (every ~8 items from 3-hour forecast)
           const daily: ForecastListItem[] = (
             (f as ForecastResponse).list ?? []
           ).filter((_, idx) => idx % 8 === 0);
@@ -440,7 +443,6 @@ const Index: React.FC = () => {
   // search action (trim and let debounce trigger)
   const onSearchClick = useCallback(() => {
     setCity((c) => c.trim());
-    // pushNotification();
   }, []);
 
   // derived alerts (memoized)
@@ -449,8 +451,7 @@ const Index: React.FC = () => {
     [weatherData, getWeatherAlerts]
   );
 
-  console.log(alerts);
-
+  /* ---------- Notifications effect (standalone) ---------- */
   useEffect(() => {
     const notificationHeader = alerts[0]?.message || "Weather Update";
     const notificationMessage = weatherData
@@ -458,15 +459,8 @@ const Index: React.FC = () => {
       : null;
 
     const pushNotification = () => {
-      if (!("Notification" in window)) {
-        console.log("This browser does not support notifications.");
-        return;
-      }
-
-      if (!notificationHeader || !notificationMessage) {
-        console.log("Missing notification data, skipping...");
-        return;
-      }
+      if (!("Notification" in window)) return;
+      if (!notificationHeader || !notificationMessage) return;
 
       if (Notification.permission === "granted") {
         new Notification(notificationHeader, {
@@ -490,28 +484,37 @@ const Index: React.FC = () => {
     }
   }, [alerts, weatherData, getClothingSuggestion]);
 
-  // helper: class + icon per severity
-  const alertVisual = (severity: AlertSeverity) => {
-    if (severity === "none") {
-      return {
-        cls: "bg-alert-green text-white",
-        icon: <CheckCircle size={20} className="mt-1" />,
-      };
-    }
-    if (severity === "severe") {
-      return {
-        cls: "bg-alert-red text-white",
-        icon: <AlertTriangle size={20} className="mt-1" />,
-      };
-    }
-    // "bad"
-    return {
-      cls: "bg-alert-orange text-white",
-      icon: <AlertTriangle size={20} className="mt-1" />,
-    };
-  };
+  /* ---------- SMS effect (sibling; not nested) ---------- */
+  useEffect(() => {
+    if (!smsOptIn || !phone || !weatherData || alerts.length === 0) return;
 
-  // ---------- render ----------
+    const top = alerts[0];
+    if (top.severity === "none") return; // change to !== "severe" for severe-only
+
+    const to = toE164(phone);
+    const cityName = weatherData.name;
+    const temp = Math.round(weatherData.main?.temp ?? 0);
+    const summary = weatherData.weather?.[0]?.description ?? "";
+    const message = `[Nimbus] ${cityName}: ${top.message.replace(
+      /^[^a-zA-Z]*/,
+      ""
+    )} Temp ${temp}°C, ${summary}.`;
+
+    const key = `${cityName}|${top.message}|${temp}|${summary}`;
+    if (lastSentRef.current === key) return;
+    lastSentRef.current = key;
+
+    sendSmsApi(to, message).catch((err) => {
+      console.error("SMS failed", err);
+      // lastSentRef.current = null; // uncomment if you want to retry on failure
+    });
+  }, [alerts, smsOptIn, phone, weatherData]);
+
+  function alertVisual(severity: string): { cls: any; icon: any } {
+    throw new Error("Function not implemented.");
+  }
+
+  /* ---------- render ---------- */
   return (
     <div
       className={`min-h-screen relative overflow-hidden bg-gradient-to-br ${background}`}
@@ -554,14 +557,25 @@ const Index: React.FC = () => {
                 className="pl-10 bg-white/10 backdrop-blur-sm border-white/20 text-white placeholder:text-white/60"
               />
             </div>
-            {/* <Button
-              onClick={onSearchClick}
-              disabled={loadingSearch}
-              className="bg-yellow-500 hover:bg-yellow-600 text-black font-semibold"
-            >
-              <Search size={18} />
-            </Button> */}
           </div>
+
+          {/* OPTIONAL: phone + toggle UI so you can test SMS easily */}
+          {/* 
+          <div className="mt-3 flex gap-2 items-center">
+            <Input
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="Phone for SMS alerts (e.g., +23324xxxxxxx)"
+              className="bg-white/10 backdrop-blur-sm border-white/20 text-white placeholder:text-white/60"
+            />
+            <Button
+              onClick={() => setSmsOptIn((v) => !v)}
+              className={smsOptIn ? "bg-green-500 hover:bg-green-600 text-black" : "bg-white/20 hover:bg-white/30 text-white"}
+            >
+              {smsOptIn ? "SMS Alerts: ON" : "SMS Alerts: OFF"}
+            </Button>
+          </div>
+          */}
         </motion.div>
 
         {/* Alerts */}
@@ -594,7 +608,7 @@ const Index: React.FC = () => {
           )}
         </AnimatePresence>
 
-        {/* Main cards: skeletons while loading; actual cards when weatherData present */}
+        {/* Main cards */}
         {loadingSearch ? (
           <div className="grid md:grid-cols-3 gap-4 mb-8">
             {Array.from({ length: 3 }).map((_, i) => (
